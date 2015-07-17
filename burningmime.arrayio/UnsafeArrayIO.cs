@@ -6,9 +6,9 @@ namespace burningmime.arrayio
 {
     /// <summary>
     /// Allows fast, unsafe blitting of structure arrays to and from streams, similar to what you can do in C/C++. Because of
-    /// https://en.wikipedia.org/wiki/Endianness , the written data is not guarunteed to be compatible between processor architectures --
+    /// https://en.wikipedia.org/wiki/Endianness , the written data is not guaranteed to be compatible between processor architectures --
     /// in particular, it's not compatible with regular <see cref="BinaryReader"/> and <see cref="BinaryWriter"/>, nor with many
-    /// network protocols. It can provide a gargantuan performance advantage against BinaryReader/BinaryWriter in certain cases; just
+    /// network protocols. It can provide a gargantuan performance advantage against BinaryReader/BinaryWriter in certain cases, just
     /// be sure it's both written and read using this class.
     /// 
     /// USE AT YOUR OWN RISK!
@@ -36,7 +36,7 @@ namespace burningmime.arrayio
             int nBytes = elementCount * converter.SizeOf;
             byte[] buffer = new byte[nBytes];
             stream.Read(buffer, 0, nBytes);
-            return (T[]) converter.ConvertFromByte(buffer, elementCount);
+            return (T[]) converter.ConvertFromByte(buffer, elementCount, true);
         }
 
         /// <summary>
@@ -60,7 +60,7 @@ namespace burningmime.arrayio
             int nBytes = elementCount * converter.SizeOf;
             byte[] buffer = new byte[nBytes];
             stream.Read(buffer, 0, nBytes);
-            return (T[]) converter.ConvertFromByte(buffer, elementCount);
+            return (T[]) converter.ConvertFromByte(buffer, elementCount, true);
         }
 
         /// <summary>
@@ -102,7 +102,7 @@ namespace burningmime.arrayio
                 if(isThreadSafe)
                 {
                     // If we changed the original array type, change it back.
-                    converter.ConvertFromByte(buffer, elementCount);
+                    converter.ConvertFromByte(buffer, elementCount, false);
                 }
             }
         }
@@ -146,7 +146,7 @@ namespace burningmime.arrayio
                 if(isThreadSafe)
                 {
                     // If we changed the original array type, change it back.
-                    converter.ConvertFromByte(buffer, elementCount);
+                    converter.ConvertFromByte(buffer, elementCount, false);
                 }
             }
         }

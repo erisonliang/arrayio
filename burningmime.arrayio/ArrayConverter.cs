@@ -10,10 +10,6 @@ namespace burningmime.arrayio
     /// <summary>
     /// Class which allows for unsafe conversion of arrays from one type to another. Does not create copies of the arrays, instead
     /// simply changes the runtime type of the array to fool the CLR into thinking it's a different type.
-    /// 
-    /// TODO do we need to do the same double realignment stuff on Mono?
-    /// TODO extensive tests on x86 OS... works fine with double[] on x86 runtime on x64 OS, but not sure if it'll be the same on an x86 OS
-    /// TODO a byte[] converted to a double[] on x86 might need to be realigned... can't seem to allocate a misaligned one on x86 runtime + x86 OS, so should test on x86 OS
     /// </summary>
     internal sealed unsafe class ArrayConverter
     {
@@ -21,20 +17,20 @@ namespace burningmime.arrayio
         private static readonly int _methodTableOffset;        // offset (in units of size_t bytes) of method table from start of array data. -2 for .NET CLR, -4 for Mono
         private static readonly MethodInfo _changeToByte2;     // MethodInfo for the ChangeToByte2 method
         private static readonly Module _myModule;              // module in which this type exists
-        private static readonly bool _mustCheckDoubles;        // do we need to check double alignment on this platform?
+        private static readonly bool _mustAlignDoubles;        // do we need to check double alignment on this platform?
 
         private readonly IntPtr _pMT;                          // pointer to method table for T[]
         private readonly Action<object, int> _changeToByte1;   // generated shim which pins the array pointer
         private readonly int _sizeOf;                          // sizeof(T)
-        private readonly bool _checkDoubleAlignment;           // true iff this is a converter for double[] and the platform can align double arrays
+        private readonly bool _alignTo8Bytes;                  // true iff this is a converter for double[] and the platform should align double arrays
 
         static ArrayConverter()
         {
             bool isMono = Type.GetType("Mono.Runtime") != null;
-            _methodTableOffset = isMono ? - 4 : -2;
+            _methodTableOffset = isMono ? -4 : -2;
             _changeToByte2 = typeof(ArrayConverter).GetMethod("ChangeToByte2", BindingFlags.Static | BindingFlags.Public);
             _myModule = typeof(ArrayConverter).Module;
-            _mustCheckDoubles = !isMono && sizeof(IntPtr) == 4; // TODO do we need to check double alignment on Mono?
+            _mustAlignDoubles = sizeof(IntPtr) == 4;
             byte[] bytes = new byte[1];
             fixed(byte* p = bytes)
                 _pMT_byte = ((IntPtr*) p)[_methodTableOffset];
@@ -47,27 +43,12 @@ namespace burningmime.arrayio
         /// <param name="oneElemArray">Array of the given type with length 1 or more (used to get method table pointer).</param>
         public ArrayConverter(Type baseType, object oneElemArray)
         {
-            if(_mustCheckDoubles && baseType == typeof(double))
-            {
-                _checkDoubleAlignment = true;
-                _sizeOf = 8;
-                fixed(double* p = (double[]) oneElemArray)
-                {
-                    IntPtr* pp = (IntPtr*) p;
-                    int ofs = _methodTableOffset;
-                    if(pp[-1] == IntPtr.Zero)
-                        ofs -= 3;
-                    _pMT = ((IntPtr*) p)[ofs];
-                }
-            }
-            else
-            {
-                _sizeOf = Marshal.SizeOf(baseType); // do this first since it throws a nice error for non-unmanaged types
-                Type arrayType = baseType.MakeArrayType();
-                Type refType = baseType.MakeByRefType();
-                _pMT = GetMethodTablePointer(baseType, arrayType, refType, oneElemArray);
-                _changeToByte1 = CreateChangeToByte1(baseType, arrayType, refType);
-            }
+            _alignTo8Bytes = _mustAlignDoubles && baseType == typeof(double);
+            _sizeOf = Marshal.SizeOf(baseType); // do this first since it throws a nice error for non-unmanaged types
+            Type arrayType = baseType.MakeArrayType();
+            Type refType = baseType.MakeByRefType();
+            _pMT = GetMethodTablePointer(baseType, arrayType, refType, oneElemArray);
+            _changeToByte1 = CreateChangeToByte1(baseType, arrayType, refType);
         }
 
         /// <summary>
@@ -84,12 +65,26 @@ namespace burningmime.arrayio
         /// 
         /// The array must not be null or empty.
         /// </summary>
-        public object ConvertFromByte(byte[] buffer, int newSize)
+        public object ConvertFromByte(byte[] buffer, int newSize, bool allowRealloc)
         {
-            // TODO do we need to manually re-align doubles on x86?
+            bool realign;
             fixed(byte* p = buffer)
+            {
                 ChangeArrayType((IntPtr*) p, newSize, _pMT);
-            return buffer;
+                realign = allowRealloc && _alignTo8Bytes && (long) p % 8 != 0;
+            }
+
+            if(realign)
+            {
+                double[] src = (double[]) (object) buffer;
+                double[] dst = new double[src.Length];
+                Array.Copy(src, dst, src.Length);
+                return dst;
+            }
+            else
+            {
+                return buffer;
+            }
         }
 
         /// <summary>
@@ -100,26 +95,13 @@ namespace burningmime.arrayio
         /// </summary>
         public byte[] ConvertToByte(object array, int newSize)
         {
-            if(_checkDoubleAlignment)
-            {
-                fixed(double* p = (double[]) array)
-                {
-                    IntPtr* pp = (IntPtr*) p;
-                    if(pp[-1] == IntPtr.Zero)
-                        pp -= 3;
-                    ChangeToByte2(pp, newSize);
-                }
-            }
-            else
-            {
-                _changeToByte1(array, newSize);
-            }
+            _changeToByte1(array, newSize);
             return (byte[]) array;
         }
 
         /// <summary>
         /// Called by the generated shim for changing T[] to byte[]. Just calls <see cref="ChangeArrayType"/> with the correct args.
-        /// Note tyhis method is public so it can be accessed by the generated code. It should not be used from outside this class.
+        /// Note this method is public so it can be accessed by the generated code. It should not be used from outside this class.
         /// </summary>
         public static void ChangeToByte2(IntPtr* p, int newSize)
         {

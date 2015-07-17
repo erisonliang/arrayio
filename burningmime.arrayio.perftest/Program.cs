@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Numerics;
+using System.Runtime.InteropServices;
 
 namespace burningmime.arrayio.perftest
 {
@@ -10,28 +11,27 @@ namespace burningmime.arrayio.perftest
         public static void Main(string[] args)
         {
             Matrix4x4[] data = CreateTestData();
+            Console.WriteLine("Test data: " + data.Length + " matrices = " + (data.LongLength * Marshal.SizeOf(typeof(Matrix4x4)) / 1024.0 / 1024.0).ToString("#.##") + "MiB");
             string filename = Path.GetTempFileName();
             try
             {
                 Stopwatch sw = new Stopwatch();
-                sw.Start();
+
+                sw.Restart();
                 TestBinaryWriterAndReader(filename, data);
                 sw.Stop();
-                Console.WriteLine("Using BinaryReader and BinaryWriter to write, read, and verify " + data.Length + " matrices took " + sw.Elapsed.TotalMilliseconds + "ms and 52 lines of code");
-                Console.WriteLine();
+                Console.WriteLine("BinaryWriter/BinaryReader: " + sw.Elapsed.TotalMilliseconds + "ms");
                 
                 sw.Restart();
                 TestUnsafeIO(filename, data);
                 sw.Stop();
-                Console.WriteLine("Using UnsafeArrayIO to write, read, and verify " + data.Length + " matrices took " + sw.Elapsed.TotalMilliseconds + "ms and 12 lines of code");
+                Console.WriteLine("UnsafeArrayIO: " + sw.Elapsed.TotalMilliseconds + "ms");
                 Console.WriteLine();
             }
             finally
             {
                 File.Delete(filename);
             }
-
-            //Console.ReadLine();
         }
 
         private static void TestBinaryWriterAndReader(string filename, Matrix4x4[] data)
