@@ -111,7 +111,7 @@ IntPtr GetMethodTablePointerForFloatArray()
     fixed(float* p = oneElemArray)
     {
         IntPtr* p2 = (IntPtr*) p;
-        return p[-2];
+        return p2[-2];
     }
 }
 ```
