@@ -11,7 +11,7 @@ methods or by directly blitting the memory On my computer (which has an SSD, so 
 using direct memory blitting than using the traditional methods. This is the average of 1000 runs.
 
 [Test program](/burningmime.arrayio.perftest/Program.cs)  
-[Result data (lots of numbers)](/results.txt) -- first column is using BinaryReader/BinaryWriter, second column is UnsafeArrayIO
+[Raw data](/results.txt)
 
 ### What is this?
 
