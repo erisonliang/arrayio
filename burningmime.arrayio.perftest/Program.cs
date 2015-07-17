@@ -10,23 +10,28 @@ namespace burningmime.arrayio.perftest
     {
         public static void Main(string[] args)
         {
-            Matrix4x4[] data = CreateTestData();
-            Console.WriteLine("Test data: " + data.Length + " matrices = " + (data.LongLength * Marshal.SizeOf(typeof(Matrix4x4)) / 1024.0 / 1024.0).ToString("#.##") + "MiB");
             string filename = Path.GetTempFileName();
             try
             {
                 Stopwatch sw = new Stopwatch();
+                Matrix4x4[] data = CreateTestData();
+                Console.WriteLine("Test data: " + data.Length + " matrices = " + (data.LongLength * Marshal.SizeOf(typeof(Matrix4x4)) / 1024.0 / 1024.0).ToString("#.##") + "MiB");
+                const int N_TEST_RUNS = 1000;
 
-                sw.Restart();
-                TestBinaryWriterAndReader(filename, data);
-                sw.Stop();
-                Console.WriteLine("BinaryWriter/BinaryReader: " + sw.Elapsed.TotalMilliseconds + "ms");
+                for(int i = 0; i < N_TEST_RUNS; i++)
+                {
+                     sw.Restart();
+                    TestBinaryWriterAndReader(filename, data);
+                    sw.Stop();
+                    double timeA = sw.Elapsed.TotalMilliseconds;
                 
-                sw.Restart();
-                TestUnsafeIO(filename, data);
-                sw.Stop();
-                Console.WriteLine("UnsafeArrayIO: " + sw.Elapsed.TotalMilliseconds + "ms");
-                Console.WriteLine();
+                    sw.Restart();
+                    TestUnsafeIO(filename, data);
+                    sw.Stop();
+                    double timeB = sw.Elapsed.TotalMilliseconds;
+
+                    Console.WriteLine("{0:#.###} {1:#.###}", timeA, timeB);
+                }
             }
             finally
             {
@@ -121,7 +126,7 @@ namespace burningmime.arrayio.perftest
             return data;
         }
 
-        private static void Verify(Matrix4x4[] original, Matrix4x4[] check)
+        [Conditional("DEBUG")] private static void Verify(Matrix4x4[] original, Matrix4x4[] check)
         {
             if(original.Length != check.Length) throw new InvalidOperationException("Original and result data have different lengths!");
             for(int i = 0; i < original.Length; i++)

@@ -1,20 +1,23 @@
-# Reading and Writing Binary Data Up To 5x Faster In .NET Using Unsafe Code
+# Reading and Writing Binary Data 3x Faster In .NET Using Unsafe Code
+
+### Performance Comparison
 
 OK, graph first:
 
-**TODO**
+![perf-chart-0.png](/perf-chart-0.png)
 
-This is the average performance of reading, then writing 500,000 matrices (about 32MB of data) using either traditional BinaryWriter/BinaryReader
-methods or by directly blitting the memory and skipping all type checks. On my computer (which has an SSD, so the actual I/O is quite fast), it's more than 5x
-faster using direct memory blitting than using the traditional methods. Average of 100 runs taken; was pretty stable.
+This is the average performance of reading, then writing 500,000 matrices (about 30.5 MB of data) using either traditional BinaryWriter/BinaryReader
+methods or by directly blitting the memory On my computer (which has an SSD, so the actual I/O is quite fast), it's about **3.232x faster**
+using direct memory blitting than using the traditional methods. This is the average of 1000 runs.
+
+[Test program](/burningmime.arrayio.perftest/Program.cs)
+[Result data (lots of numbers)](/results.txt) -- first column is using BinaryReader/BinaryWriter, second column is UnsafeArrayIO
 
 ### What is this?
 
-**DO NOT USE THIS LIBRARY IN PRODUCTION -- RIGHT NOW IT IS JUST A PROOF OF CONCEPT!**
-
 C/C++ programmers are familiar with the idea of being able to read or write large amounts of data into a `void*`/`char*` then casting it to the correct type.
 This is useful for things like large arrays of numbers for scientific applications or custom vertex data in graphics applications. Unfortunately, .NET does not
-directly provide the ability to cast a `byte[]` to a `double[]` or `Vector3[]`, or whatever. So, if you wanted to read 10,000 vectors from a file, you'd need to do something like:
+directly provide the ability to cast a `byte[]` to a `double[]`, or `Vector3[]`, or whatever. So, if you wanted to read 10,000 vectors from a file, you'd need to do something like:
 
 ```C#
 Vector3[] vectors = new Vector3[10000];
@@ -74,13 +77,13 @@ using this library, you should read it using this library (or a C/C++ program th
 * For structures such as vertex formats, versioning is an issue (but it's an issue with the BinaryReader method, too). Make sure the data is written in the same format it's read in.
 * It doesn't work with arrays which have [non-default lower and upper bounds](https://msdn.microsoft.com/en-us/library/system.array.getlowerbound(v=vs.110).aspx). If you don't know what this is, don't worry about it.
 * It doesn't work for `stackalloc`ed arrays.
-* It's very untested and completely not ready for production use. Ultimately, the plan is to use this in a Unity game I'm writing, so I'll test it quite a bit more on Mono over time. At this point, however, it's
+* **It's very untested and completely not ready for production use.** Ultimately, the plan is to use this in a Unity game I'm writing, so I'll test it quite a bit more on Mono over time. At this point, however, it's
 mostly just an example of how something like this could work and not a production-quality library. Use at your own risk.
 
 ### How does it work?
 
 The basic idea is that we want to read or write the data as a byte[] since writing large amounts of data in bulk is very fast. To do this, we need to be able to trick the runtime into thinking
-the data is in a different format than it is. It turns out that in the .NET CLR arrays are laid out on the heap like this:
+the data is in a different format than it is. It turns out that in the .NET CLR arrays get laid out on the heap like this:
 
 ![array-layout-clr.png](/array-layout-clr.png)
 
