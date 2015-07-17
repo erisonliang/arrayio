@@ -10,7 +10,7 @@ This is the average performance of writing, then reading 500,000 matrices (about
 methods or by directly blitting the memory On my computer (which has an SSD, so the actual I/O is quite fast), it's about **3.232x faster**
 using direct memory blitting than using the traditional methods. This is the average of 1000 runs.
 
-[Test program](/burningmime.arrayio.perftest/Program.cs)
+[Test program](/burningmime.arrayio.perftest/Program.cs)  
 [Result data (lots of numbers)](/results.txt) -- first column is using BinaryReader/BinaryWriter, second column is UnsafeArrayIO
 
 ### What is this?
