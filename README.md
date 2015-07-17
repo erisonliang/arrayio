@@ -141,3 +141,8 @@ The comment there says it better than I ever could:
 
 This appears to only be an issue with `double[]` and not an array of `struct S { double d; }`, even though they're exactly the same thing in memory. The workaround is to
 make an aligned copy after converting.
+
+The entire implementation lives in these two files:
+
+[UnsafeArrayIO.cs](/burningmime.arrayio/UnsafeArrayIO.cs) - Public API  
+[ArrayConverter.cs](/burningmime.arrayio/ArrayConverter.cs) - Interesting stuff
