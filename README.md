@@ -6,7 +6,7 @@ OK, graph first:
 
 ![perf-chart-0.png](/perf-chart-0.png)
 
-This is the average performance of reading, then writing 500,000 matrices (about 30.5 MB of data) using either traditional BinaryWriter/BinaryReader
+This is the average performance of writing, then reading 500,000 matrices (about 30.5 MB of data) using either traditional BinaryWriter/BinaryReader
 methods or by directly blitting the memory On my computer (which has an SSD, so the actual I/O is quite fast), it's about **3.232x faster**
 using direct memory blitting than using the traditional methods. This is the average of 1000 runs.
 
