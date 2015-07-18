@@ -1,18 +1,5 @@
 # Reading and Writing Binary Data 3x Faster In .NET Using Unsafe Code
 
-### Performance Comparison
-
-OK, graph first:
-
-![perf-chart-0.png](/perf-chart-0.png)
-
-This is the average performance of writing, then reading 500,000 matrices (about 30.5 MB of data) using either traditional BinaryWriter/BinaryReader
-methods or by directly blitting the memory On my computer (which has an SSD, so the actual I/O is quite fast), it's about **3.232x faster**
-using direct memory blitting than using the traditional methods. This is the average of 1000 runs.
-
-[Test program](/burningmime.arrayio.perftest/Program.cs)  
-[Raw data](/results.txt)
-
 ### What is this?
 
 C/C++ programmers are familiar with the idea of being able to read or write large amounts of data into a `void*`/`char*` then casting it to the correct type.
@@ -70,15 +57,26 @@ This way is a little faster and less memory-intensive since it doesn't create a 
 ### But there are some caveats...
 
 * This only works in a full-trust environment since it uses unsafe code and code generation. No Silverlight, Windows Phone, MonoTouch, etc.
-* This only works for non-managed data types. No strings, no class references, nada. If the type in question can't be used in a `fixed()` expression, don't try to use it here. The type needs to have a fixed runtime size.
+* This only works for non-managed data types. It must not contain any class references or strings. If the type in question can't be used in a `fixed()` expression, don't try to use it here.
 * It is dependent on the [Endianess](https://en.wikipedia.org/wiki/Endianness) of the processor. In practice, most processors today are little-endian (ARM is bi-endian but most of the time it's running in little-endian mode). This will
 mainly impact its ability to be used on certain networking protocols since network byte order is big-endian. .NET's built-in BinaryWriter and BinaryReader read/write in big endian, too. So basically if you write it
 using this library, you should read it using this library (or a C/C++ program that uses the same byte order).
 * For structures such as vertex formats, versioning is an issue (but it's an issue with the BinaryReader method, too). Make sure the data is written in the same format it's read in.
 * It doesn't work with arrays which have [non-default lower and upper bounds](https://msdn.microsoft.com/en-us/library/system.array.getlowerbound(v=vs.110).aspx). If you don't know what this is, don't worry about it.
-* It doesn't work for `stackalloc`ed arrays.
+* It doesn't work for `stackalloc`ed arrays. Again, not a big worry most of the time.
 * **It's very untested and completely not ready for production use.** Ultimately, the plan is to use this in a Unity game I'm writing, so I'll test it quite a bit more on Mono over time. At this point, however, it's
-mostly just an example of how something like this could work and not a production-quality library. Use at your own risk.
+just a proof of concept, not a production-quality library. Use at your own risk.
+
+### Performance Comparison
+
+![perf-chart-0.png](/perf-chart-0.png)
+
+This is the average performance of writing, then reading 500,000 matrices (about 30.5 MB of data) using either traditional BinaryWriter/BinaryReader
+methods or by directly blitting the memory. On my computer (which has an SSD, so the actual I/O is quite fast), it's about **3.232x faster**
+using direct memory blitting than using the traditional methods. This is the average of 1000 runs.
+
+[Test program](/burningmime.arrayio.perftest/Program.cs)  
+[Raw data](/results.txt)
 
 ### How does it work?
 
@@ -90,7 +88,7 @@ the data is in a different format than it is. It turns out that in the .NET CLR 
 If you understood that diagram and are familiar with unsafe C#, then you know what we need to do :-). To convert a `byte[]` to a `float[]` we can do something like this:
 
 ```C#
-float[] ConvertToFloat(byte[] bytes)
+float[] ConvertToFloatArray(byte[] bytes)
 {
     fixed(byte* p = bytes)
     {
@@ -102,7 +100,7 @@ float[] ConvertToFloat(byte[] bytes)
 }
 ```
 
-To get the method table pointer for a float[], we can simply do the reverse:
+To get the method table pointer for a `float[]`, we can simply do the reverse:
 
 ```C#
 IntPtr GetMethodTablePointerForFloatArray()
@@ -116,7 +114,7 @@ IntPtr GetMethodTablePointerForFloatArray()
 }
 ```
 
-It would be nearly this easy except we can't do this with generics, since there's no way to get a `T*` for a generic `T` even if we do `where T : struct`. Oh, if only there were a `where T : fixed`... *sigh*.
+It would be nearly this easy except we can't do this with generics, since there's no way to get a `T*` for a generic `T` even if we do `where T : struct`.
 So we need to use code generation and create some dynamic IL to do the proper casts.
 
 Also, we also want to do any of the actual memory manipulation inside a [Constrained Execution Region](https://msdn.microsoft.com/en-us/library/ms228973%28v=vs.110%29.aspx?f=255&MSPPError=-2147217396)
@@ -140,7 +138,7 @@ The comment there says it better than I ever could:
 ```
 
 This appears to only be an issue with `double[]` and not an array of `struct S { double d; }`, even though they're exactly the same thing in memory. The workaround is to
-make an aligned copy after converting.
+allocate an array of double[] when reading, convert it to byte[] for the actual read, then convert back to double[]. Nicely aligned with no copies necessary!
 
 The entire implementation lives in these two files:
 

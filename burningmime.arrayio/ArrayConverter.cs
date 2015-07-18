@@ -22,7 +22,7 @@ namespace burningmime.arrayio
         private readonly IntPtr _pMT;                          // pointer to method table for T[]
         private readonly Action<object, int> _changeToByte1;   // generated shim which pins the array pointer
         private readonly int _sizeOf;                          // sizeof(T)
-        private readonly bool _alignTo8Bytes;                  // true iff this is a converter for double[] and the platform should align double arrays
+        private readonly bool _useDoubleHack;                  // true iff this is a converter for double[] and the platform should align double arrays
 
         static ArrayConverter()
         {
@@ -43,7 +43,7 @@ namespace burningmime.arrayio
         /// <param name="oneElemArray">Array of the given type with length 1 or more (used to get method table pointer).</param>
         public ArrayConverter(Type baseType, object oneElemArray)
         {
-            _alignTo8Bytes = _mustAlignDoubles && baseType == typeof(double);
+            _useDoubleHack = _mustAlignDoubles && baseType == typeof(double);
             _sizeOf = Marshal.SizeOf(baseType); // do this first since it throws a nice error for non-unmanaged types
             Type arrayType = baseType.MakeArrayType();
             Type refType = baseType.MakeByRefType();
@@ -60,31 +60,24 @@ namespace burningmime.arrayio
         }
 
         /// <summary>
+        /// Must arrays be allocated on 8-byte boundaries in the small object heap when reading?
+        /// </summary>
+        public bool UseDoubleHack
+        {
+            get { return _useDoubleHack; }
+        }
+
+        /// <summary>
         /// Changes the array type to T[] and the length to newLen. Modifies the array itself; does not return a copy of the array.
         /// This is very, very thread-unsafe. Be 200% sure that no other thread can access the array when it's in its changed state.
         /// 
         /// The array must not be null or empty.
         /// </summary>
-        public object ConvertFromByte(byte[] buffer, int newSize, bool allowRealloc)
+        public object ConvertFromByte(byte[] buffer, int newSize)
         {
-            bool realign;
             fixed(byte* p = buffer)
-            {
                 ChangeArrayType((IntPtr*) p, newSize, _pMT);
-                realign = allowRealloc && _alignTo8Bytes && (long) p % 8 != 0;
-            }
-
-            if(realign)
-            {
-                double[] src = (double[]) (object) buffer;
-                double[] dst = new double[src.Length];
-                Array.Copy(src, dst, src.Length);
-                return dst;
-            }
-            else
-            {
-                return buffer;
-            }
+            return buffer;
         }
 
         /// <summary>

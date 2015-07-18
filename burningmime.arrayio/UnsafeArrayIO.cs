@@ -27,16 +27,22 @@ namespace burningmime.arrayio
         /// <returns>The correctly typed array.</returns>
         public static T[] ReadArray<T>(Stream stream, int elementCount) where T : struct
         {
-            if(elementCount <= 0)
-            {
-                return new T[0];
-            }
-
+            if(stream == null) throw new ArgumentNullException("stream");
+            if(elementCount <= 0) return new T[0];
             ArrayConverter converter = GetConverter<T>();
             int nBytes = elementCount * converter.SizeOf;
-            byte[] buffer = new byte[nBytes];
+            byte[] buffer;
+            if(converter.UseDoubleHack)
+            {
+                double[] doubles = new double[elementCount];
+                buffer = converter.ConvertToByte(doubles, nBytes);
+            }
+            else
+            {
+                buffer = new byte[nBytes];
+            }
             stream.Read(buffer, 0, nBytes);
-            return (T[]) converter.ConvertFromByte(buffer, elementCount, true);
+            return (T[]) converter.ConvertFromByte(buffer, elementCount);
         }
 
         /// <summary>
@@ -51,16 +57,22 @@ namespace burningmime.arrayio
         /// <returns>The correctly typed array.</returns>
         public static T[] ReadArray<T>(BinaryReader stream, int elementCount) where T : struct
         {
-            if(elementCount <= 0)
-            {
-                return new T[0];
-            }
-
+            if(stream == null) throw new ArgumentNullException("stream");
+            if(elementCount <= 0) return new T[0];
             ArrayConverter converter = GetConverter<T>();
             int nBytes = elementCount * converter.SizeOf;
-            byte[] buffer = new byte[nBytes];
+            byte[] buffer;
+            if(converter.UseDoubleHack)
+            {
+                double[] doubles = new double[elementCount];
+                buffer = converter.ConvertToByte(doubles, nBytes);
+            }
+            else
+            {
+                buffer = new byte[nBytes];
+            }
             stream.Read(buffer, 0, nBytes);
-            return (T[]) converter.ConvertFromByte(buffer, elementCount, true);
+            return (T[]) converter.ConvertFromByte(buffer, elementCount);
         }
 
         /// <summary>
@@ -76,10 +88,9 @@ namespace burningmime.arrayio
         /// will likely crash or unexpected behavior will happen. If even a tiny bit unsure, leave this as false.</param>
         public static void WriteArray<T>(Stream stream, T[] array, bool isThreadSafe = false) where T : struct
         {
-            if(array == null || array.Length == 0)
-            {
-                return;
-            }
+            if(stream == null) throw new ArgumentNullException("stream");
+            if(array == null || array.Length == 0) return;
+            if(array.GetLowerBound(0) != 0) throw new InvalidOperationException("Array lower bound must be 0");
 
             if(!isThreadSafe)
             {
@@ -102,7 +113,7 @@ namespace burningmime.arrayio
                 if(isThreadSafe)
                 {
                     // If we changed the original array type, change it back.
-                    converter.ConvertFromByte(buffer, elementCount, false);
+                    converter.ConvertFromByte(buffer, elementCount);
                 }
             }
         }
@@ -120,10 +131,9 @@ namespace burningmime.arrayio
         /// will likely crash or unexpected behavior will happen. If even a tiny bit unsure, leave this as false.</param>
         public static void WriteArray<T>(BinaryWriter stream, T[] array, bool isThreadSafe = false) where T : struct
         {
-            if(array == null || array.Length == 0)
-            {
-                return;
-            }
+            if(stream == null) throw new ArgumentNullException("stream");
+            if(array == null || array.Length == 0) return;
+            if(array.GetLowerBound(0) != 0) throw new InvalidOperationException("Array lower bound must be 0");
 
             if(!isThreadSafe)
             {
@@ -146,7 +156,7 @@ namespace burningmime.arrayio
                 if(isThreadSafe)
                 {
                     // If we changed the original array type, change it back.
-                    converter.ConvertFromByte(buffer, elementCount, false);
+                    converter.ConvertFromByte(buffer, elementCount);
                 }
             }
         }
